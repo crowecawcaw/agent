@@ -1,0 +1,82 @@
+{
+  "debug": false,
+  "max_iterations": 10,
+  "providers": {
+    "providers": [
+      {
+        "id": "openai",
+        "name": "OpenAI",
+        "base_url": "https://api.openai.com/v1",
+        "api_key": "env:OPENAI_API_KEY",
+        "models": [
+          {
+            "id": "gpt-4o",
+            "name": "GPT-4o",
+            "config": {
+              "max_tokens": 4096,
+              "temperature": 0.7,
+              "top_p": 0.9
+            }
+          },
+          {
+            "id": "gpt-4o-mini",
+            "name": "GPT-4o Mini",
+            "config": {
+              "max_tokens": 4096,
+              "temperature": 0.7,
+              "top_p": 0.9
+            }
+          }
+        ]
+      },
+      {
+        "id": "openrouter",
+        "name": "OpenRouter",
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key": "env:OPENROUTER_API_KEY",
+        "models": [
+          {
+            "id": "moonshotai/kimi-k2",
+            "name": "MoonshotAI: Kimi K2",
+            "config": {
+              "max_tokens": 4096,
+              "temperature": 0.7,
+              "top_p": 0.9
+            }
+          },
+          {
+            "id": "anthropic/claude-3.5-sonnet",
+            "name": "Claude 3.5 Sonnet",
+            "config": {
+              "max_tokens": 4096,
+              "temperature": 0.7,
+              "top_p": 0.9
+            }
+          },
+          {
+            "id": "deepseek/deepseek-v3",
+            "name": "DeepSeek V3",
+            "config": {
+              "max_tokens": 4096,
+              "temperature": 0.7,
+              "top_p": 0.9
+            }
+          },
+          {
+            "id": "google/gemini-flash-1.5",
+            "name": "Gemini Flash 1.5",
+            "config": {
+              "max_tokens": 4096,
+              "temperature": 0.7,
+              "top_p": 0.9
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "model": {
+    "provider": "openrouter",
+    "model": "anthropic/claude-3.5-sonnet"
+  }
+}
