@@ -1,286 +1,135 @@
 package tools
 
 import (
-	"bufio"
+	"agent/api"
+	"agent/models"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
+	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"runtime"
 	"strings"
-	"sync"
+	"syscall"
 	"time"
 
-	"agent/theme"
+	"github.com/google/uuid"
 )
 
-type ShellTool struct {
-	*BaseTool
-	workingDir     string
-	deniedCommands []string
-	timeout        time.Duration
-}
-
-func NewShellTool() *ShellTool {
+// NewShellTool creates a shell tool definition
+func NewShellTool(getModel func() *models.Model) models.ToolDefinition {
 	schema := map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
 			"command": map[string]interface{}{
 				"type":        "string",
-				"description": "Shell command to execute using bash",
-			},
-			"description": map[string]interface{}{
-				"type":        "string",
-				"description": "Brief description of what the command does (optional)",
-			},
-			"working_directory": map[string]interface{}{
-				"type":        "string",
-				"description": "Directory to run command in, relative to current directory (optional)",
+				"description": "Shell command to execute",
 			},
 		},
 		"required": []interface{}{"command"},
 	}
 
-	tool := &ShellTool{
-		BaseTool: NewBaseTool(
-			"shell",
-			"Execute shell commands using bash. Supports most common Unix commands and operations and supports any software the user has installed.",
-			schema,
-		),
-		workingDir: ".",
-		deniedCommands: []string{
-			"sudo", "su", "rm", "rmdir", "del", "deltree",
-			"format", "fdisk", "mkfs", "dd", "shutdown", "reboot",
-			"halt", "poweroff", "init", "systemctl", "service",
-			"chown", "chmod 777", "chmod -R 777", "killall",
-			"pkill", "kill -9", "kill -KILL", "> /dev/", "curl -X DELETE",
-			"wget --post-data", "nc -l", "netcat -l", "python -m http.server",
-			"python3 -m http.server", "php -S", "ruby -run-httpd",
-		},
-		timeout: 30 * time.Second,
-	}
-
-	return tool
-}
-
-func (s *ShellTool) Execute(ctx context.Context, params map[string]interface{}, statusCh chan<- string) (string, error) {
-	command, workDir, err := s.extractParams(params)
-	if err != nil {
-		// Return actual error instead of formatted string
-		return "", NewToolError(s.Name(), "parameter validation failed", err)
-	}
-
-	// Send status update with command info
-	if len(command) > 50 {
-		statusCh <- fmt.Sprintf("Executing shell command: %s...\n", theme.CodeText(command[:47]))
-	} else {
-		statusCh <- fmt.Sprintf("Executing shell command: %s\n", theme.CodeText(command))
-	}
-
-	// Execute command
-	result, err := s.executeCommand(ctx, command, workDir)
-
-	// Send completion status
-	if err != nil {
-		statusCh <- fmt.Sprintf("Error running command: %s\n", err)
-		return result, WrapToolError(s.Name(), err)
-	}
-
-	return result, nil
-}
-
-// extractParams consolidates parameter extraction and validation
-func (s *ShellTool) extractParams(params map[string]interface{}) (string, string, error) {
-	// Extract command
-	command, ok := params["command"].(string)
-	if !ok {
-		return "", "", NewToolError(s.Name(), "command parameter must be a string", nil)
-	}
-
-	command = strings.TrimSpace(command)
-	if command == "" {
-		return "", "", NewToolError(s.Name(), "command cannot be empty", nil)
-	}
-
-	// Validate command safety
-	if err := s.validateCommandSafety(command); err != nil {
-		return "", "", WrapToolError(s.Name(), err)
-	}
-
-	// Extract and validate working directory
-	workDir := s.workingDir
-	if wd, exists := params["working_directory"]; exists && wd != nil {
-		wdStr, ok := wd.(string)
-		if ok && wdStr != "" {
-			if filepath.IsAbs(wdStr) {
-				return "", "", NewToolError(s.Name(), "working_directory must be relative", nil)
-			}
-
-			absPath, err := filepath.Abs(filepath.Join(s.workingDir, wdStr))
-			if err != nil {
-				return "", "", NewToolError(s.Name(), fmt.Sprintf("invalid working directory: %v", err), err)
-			}
-
-			if _, err := os.Stat(absPath); os.IsNotExist(err) {
-				return "", "", NewToolError(s.Name(), fmt.Sprintf("working directory does not exist: %s", wdStr), err)
-			}
-
-			workDir = absPath
-		}
-	}
-
-	return command, workDir, nil
-}
-
-func (s *ShellTool) validateCommandSafety(command string) error {
-	lowerCommand := strings.ToLower(command)
-
-	for _, denied := range s.deniedCommands {
-		deniedLower := strings.ToLower(denied)
-		if strings.HasPrefix(lowerCommand, deniedLower) {
-			// Ensure it's a word boundary
-			if len(lowerCommand) == len(deniedLower) ||
-				lowerCommand[len(deniedLower)] == ' ' ||
-				lowerCommand[len(deniedLower)] == '\t' {
-				return fmt.Errorf("command '%s' is not allowed for security reasons", denied)
-			}
+	// shell implements the shell command functionality
+	shell := func(ctx context.Context, params map[string]interface{}) (string, string, error) {
+		command, ok := params["command"].(string)
+		if !ok {
+			return "", "", fmt.Errorf("command must be a string")
 		}
 
-		// Check after separators
-		separators := []string{"|", ";", "&&", "||"}
-		for _, sep := range separators {
-			parts := strings.Split(lowerCommand, sep)
-			for _, part := range parts {
-				part = strings.TrimSpace(part)
-				if strings.HasPrefix(part, deniedLower) {
-					if len(part) == len(deniedLower) ||
-						part[len(deniedLower)] == ' ' ||
-						part[len(deniedLower)] == '\t' {
-						return fmt.Errorf("command '%s' is not allowed for security reasons", denied)
-					}
+		// Audit command against security policy
+		// approved, auditMsg, err := auditCommand(ctx, getModel(), command, "Do not allow any files to be deleted.")
+		// if err != nil {
+		// 	return "", "", fmt.Errorf("command audit failed: %w", err)
+		// }
+		// if !approved {
+		// 	return "", "", fmt.Errorf("command rejected by security policy: %s", auditMsg)
+		// }
+
+		cmd := exec.CommandContext(ctx, "sh", "-c", command)
+		cmd.Env = os.Environ()
+		cwd, _ := os.Getwd()
+		start := time.Now()
+
+		// Execute command
+		output, err := cmd.CombinedOutput()
+		duration := time.Since(start)
+
+		var exitCode int
+		if err != nil {
+			if exitError, ok := err.(*exec.ExitError); ok {
+				if status, ok := exitError.Sys().(syscall.WaitStatus); ok {
+					exitCode = status.ExitStatus()
 				}
+			} else {
+				return "", "", fmt.Errorf("failed to execute command `%s`: %w", command, err)
 			}
-		}
-	}
-
-	return nil
-}
-
-func (s *ShellTool) executeCommand(ctx context.Context, command, workDir string) (string, error) {
-	execCtx, cancel := context.WithTimeout(ctx, s.timeout)
-	defer cancel()
-
-	cmd := s.createCommand(execCtx, command, workDir)
-
-	// Set up output capture
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to create stdout pipe: %v", err)
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to create stderr pipe: %v", err)
-	}
-
-	// Start command
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("failed to start command: %v", err)
-	}
-
-	// Stream output and capture result
-	output := s.streamAndCaptureOutput(stdout, stderr)
-
-	// Wait for completion
-	err = cmd.Wait()
-
-	// Handle different error types
-	if err != nil {
-		if ctx.Err() == context.Canceled {
-			return s.formatResult(output, fmt.Errorf("command cancelled")), nil
-		}
-		if execCtx.Err() == context.DeadlineExceeded {
-			return s.formatResult(output, fmt.Errorf("command timed out after %v", s.timeout)), nil
-		}
-		if exitError, ok := err.(*exec.ExitError); ok {
-			return s.formatResult(output, fmt.Errorf("command failed with exit code %d", exitError.ExitCode())), nil
-		}
-		return s.formatResult(output, fmt.Errorf("command failed: %v", err)), nil
-	}
-
-	return output, nil
-}
-
-func (s *ShellTool) createCommand(ctx context.Context, command, workDir string) *exec.Cmd {
-	var cmd *exec.Cmd
-
-	if runtime.GOOS == "windows" {
-		// Try bash first, fallback to cmd
-		if _, err := exec.LookPath("bash"); err == nil {
-			cmd = exec.CommandContext(ctx, "bash", "-c", command)
 		} else {
-			cmd = exec.CommandContext(ctx, "cmd", "/c", command)
+			exitCode = 0
 		}
-	} else {
-		cmd = exec.CommandContext(ctx, "bash", "-c", command)
+
+		var agentMessage strings.Builder
+		agentMessage.WriteString(fmt.Sprintf("Command: %s\n", command))
+		agentMessage.WriteString(fmt.Sprintf("Exit code: %d\n", exitCode))
+		agentMessage.WriteString(fmt.Sprintf("Working directory: %s\n", cwd))
+		agentMessage.WriteString(fmt.Sprintf("Duration: %v\n", duration))
+			if len(strings.TrimSpace(string(output))) == 0 {
+			agentMessage.WriteString("Output: (no output)")
+		} else {
+			agentMessage.WriteString(fmt.Sprintf("Output: %s", strings.TrimSpace(string(output))))
+		}
+
+		return "", agentMessage.String(), nil
 	}
 
-	cmd.Dir = workDir
-	cmd.Env = os.Environ()
-	return cmd
+	return models.ToolDefinition{
+		Name:        "shell",
+		Description: "Execute a shell command and return the output. The user will see the command output directly in their terminal. Use this for running build commands, tests, git operations, and other system tasks.",
+		Schema:      schema,
+		Func:        shell,
+	}
 }
 
-func (s *ShellTool) streamAndCaptureOutput(stdout, stderr io.ReadCloser) string {
-	var output strings.Builder
-	var wg sync.WaitGroup
-	var mu sync.Mutex
+func auditCommand(ctx context.Context, model *models.Model, command string, policy string) (bool, string, error) {
+	log.Printf("Auditing command")
 
-	wg.Add(2)
+	systemPrompt := fmt.Sprintf(`You are a security auditor. Your task is to review commands against a given security policy.\nIf the command complies with the policy, approve it using the make_approval_decision tool.\nIf the command violates the policy, deny it using the make_approval_decision tool and explain why.\n\n# Security Policy\n%s`, policy)
 
-	// Stream stdout
-	go func() {
-		defer wg.Done()
-		scanner := bufio.NewScanner(stdout)
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Printf("│   %s\n", theme.DebugText(line))
-			mu.Lock()
-			output.WriteString(line + "\n")
-			mu.Unlock()
-		}
-	}()
-
-	// Stream stderr
-	go func() {
-		defer wg.Done()
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Fprintf(os.Stderr, "│   %s\n", theme.DebugText(line))
-			mu.Lock()
-			output.WriteString(line + "\n")
-			mu.Unlock()
-		}
-	}()
-
-	wg.Wait()
-	return output.String()
-}
-
-func (s *ShellTool) formatResult(output string, err error) string {
-	if err == nil {
-		return output
+	userPrompt := models.Message{
+		ID:      uuid.New().String(),
+		Role:    "user",
+		Content: fmt.Sprintf("Review this command and decide it complies with the security policy: `%s`", command),
+		Status:  "active",
 	}
 
-	var result strings.Builder
-	result.WriteString(fmt.Sprintf("Command failed: %v\n", err))
+	registeredTools := make(map[string]models.ToolDefinition)
+	registeredTools["make_approval_decision"] = NewApprovalTool()
 
-	if len(output) > 0 {
-		result.WriteString("\nOutput:\n")
-		result.WriteString(output)
+	content, toolCalls, err := api.Invoke(
+		ctx,
+		model,
+		[]models.Message{userPrompt},
+		systemPrompt,
+		registeredTools,
+		nil,
+	)
+
+	if err != nil {
+		return false, "", fmt.Errorf("LLM request failed: %w", err)
+	}
+	if len(toolCalls) == 0 {
+		return false, "", fmt.Errorf("LLM did not make a decision")
+	}
+	if len(toolCalls) > 1 {
+		return false, "", fmt.Errorf("LLM returned multiple decisions")
+	}
+	toolCall := toolCalls[0]
+	if toolCall.Function.Name != "make_approval_decision" {
+		return false, "", fmt.Errorf("LLM did not call the make_approval_decision tool")
+	}
+	var params map[string]interface{}
+	if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &params); err != nil {
+		return false, "", fmt.Errorf("failed to parse tool arguments: %w", err)
 	}
 
-	return result.String()
+	return params["approved"].(bool), content, nil
 }

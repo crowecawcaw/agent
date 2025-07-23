@@ -148,7 +148,7 @@ func (lc *LiveContext) SerializeDirectories() string {
 		)
 		if err != nil {
 			sections = append(sections, fmt.Sprintf("Error reading directory: %v", err))
-			LogWarning("live_context", "directory_read", err)
+			// TODO how to handle warnings LogWarning("live_context", "directory_read", err)
 		} else {
 			sections = append(sections, structure)
 		}

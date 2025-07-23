@@ -12,30 +12,23 @@ Some other features I'd like to add in the future:
 - adding a secondary agent to run an out-of-band context pruning process to remove messages and files when they are no longer needed
 - support a human-readable security policy for shell commands which is enforced by a secondary agent
 
-## Installation
-
-```bash
-git clone https://github.com/your-username/agent
-cd agent
-make build
-```
-
 ## Getting Started
 
 ```bash
-make build    # Build the project
-./bin/agent   # Run the agent
+git clone https://github.com/crowecawcaw/agent
+cd agent
+make build
+./bin/agent
 ```
 
 ### Prerequisites
 - Go 1.19 or later
 - AI service credentials (choose one):
-  - AWS credentials configured (via AWS CLI, environment variables, or IAM roles) + Amazon Bedrock access
   - OpenAI API key
   - OpenRouter API key
 
 ### Configuration
-The agent uses a persistent JSON configuration file (`~/.agent/config.json`) to store settings between sessions. Configuration is handled interactively on first run.
+The agent uses a persistent JSON configuration file (`~/.agent/config.json`) to store settings between sessions.
 
 ### Environment Variables
 - `OPENAI_API_KEY` - OpenAI API key

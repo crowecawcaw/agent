@@ -15,17 +15,13 @@ const (
 	StyleError
 	StyleWarning
 	StyleInfo
-	StyleThinking
 	StyleTool
 	StyleCommand
 	StyleDebug
 	StyleAgent
+	StyleUser
 	StyleCode
 	StyleCodeBlock
-	StyleTreeBranch
-	StyleTreeFile
-	StyleTreeDir
-	StyleTreeSize
 )
 
 type Theme struct {
@@ -37,22 +33,18 @@ var theme *Theme
 func InitializeTheme() {
 	theme = &Theme{
 		styles: map[StyleType]lipgloss.Style{
-			StylePrompt:     lipgloss.NewStyle().Foreground(lipgloss.Color("13")),                                 // Pink
-			StyleSuccess:    lipgloss.NewStyle().Foreground(lipgloss.Color("2")),                                  // Green
-			StyleError:      lipgloss.NewStyle().Foreground(lipgloss.Color("1")),                                  // Red
-			StyleWarning:    lipgloss.NewStyle().Foreground(lipgloss.Color("3")),                                  // Yellow
-			StyleInfo:       lipgloss.NewStyle().Foreground(lipgloss.Color("6")),                                  // Cyan
-			StyleThinking:   lipgloss.NewStyle().Foreground(lipgloss.Color("6")),                                  // Cyan
-			StyleTool:       lipgloss.NewStyle().Foreground(lipgloss.Color("12")),                                 // Bright Blue
-			StyleCommand:    lipgloss.NewStyle().Foreground(lipgloss.Color("218")),                                // Pink
-			StyleDebug:      lipgloss.NewStyle().Foreground(lipgloss.Color("8")),                                  // Grey
-			StyleAgent:      lipgloss.NewStyle(),                                                                  // No color (default terminal color)
-			StyleCode:       lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Background(lipgloss.Color("0")), // Green on black
-			StyleCodeBlock:  lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Background(lipgloss.Color("8")), // Green on grey
-			StyleTreeBranch: lipgloss.NewStyle().Foreground(lipgloss.Color("8")),                                  // Grey
-			StyleTreeFile:   lipgloss.NewStyle().Foreground(lipgloss.Color("15")),                                 // White
-			StyleTreeDir:    lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true),                       // Bold blue
-			StyleTreeSize:   lipgloss.NewStyle().Foreground(lipgloss.Color("8")),                                  // Grey
+			StylePrompt:    lipgloss.NewStyle().Foreground(lipgloss.Color("13")),
+			StyleSuccess:   lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
+			StyleError:     lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
+			StyleWarning:   lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
+			StyleInfo:      lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
+			StyleTool:      lipgloss.NewStyle().Foreground(lipgloss.Color("12")),
+			StyleCommand:   lipgloss.NewStyle().Padding(2, 4).Foreground(lipgloss.Color("#ffffff")).Background(lipgloss.Color("#111111")),
+			StyleDebug:     lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
+			StyleAgent:     lipgloss.NewStyle().Padding(1, 2).Background(lipgloss.Color("#232e23")),
+			StyleUser:      lipgloss.NewStyle().Padding(1, 2).Background(lipgloss.Color("#3d2d35")),
+			StyleCode:      lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Background(lipgloss.Color("0")),
+			StyleCodeBlock: lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Background(lipgloss.Color("8")),
 		},
 	}
 }
@@ -65,69 +57,19 @@ func StyledText(text string, styleType StyleType) string {
 	return theme.styles[styleType].Render(text)
 }
 
-func IndentedText(text string, styleType StyleType) string {
-	return StyledText(IndentText(text), styleType)
-}
-
-// Indentation functions
-func IndentText(text string) string {
-	return lipgloss.NewStyle().MarginLeft(2).BorderLeft(true).BorderForeground(lipgloss.Color("13")).Render(text)
-}
-
 // Convenience functions for common styles (backward compatibility)
 func PromptText(text string) string    { return StyledText(text, StylePrompt) }
 func SuccessText(text string) string   { return StyledText(text, StyleSuccess) }
 func ErrorText(text string) string     { return StyledText(text, StyleError) }
 func WarningText(text string) string   { return StyledText(text, StyleWarning) }
 func InfoText(text string) string      { return StyledText(text, StyleInfo) }
-func ThinkingText(text string) string  { return StyledText(text, StyleThinking) }
 func ToolText(text string) string      { return StyledText(text, StyleTool) }
 func CommandText(text string) string   { return StyledText(text, StyleCommand) }
 func DebugText(text string) string     { return StyledText(text, StyleDebug) }
 func AgentText(text string) string     { return StyledText(text, StyleAgent) }
+func UserText(text string) string      { return StyledText(text, StyleUser) }
 func CodeText(text string) string      { return StyledText(text, StyleCode) }
 func CodeBlockText(text string) string { return StyledText(text, StyleCodeBlock) }
-
-// Indented convenience functions
-func IndentedSuccessText(text string) string  { return IndentedText(text, StyleSuccess) }
-func IndentedErrorText(text string) string    { return IndentedText(text, StyleError) }
-func IndentedWarningText(text string) string  { return IndentedText(text, StyleWarning) }
-func IndentedInfoText(text string) string     { return IndentedText(text, StyleInfo) }
-func IndentedThinkingText(text string) string { return IndentedText(text, StyleThinking) }
-func IndentedToolText(text string) string     { return IndentedText(text, StyleTool) }
-func IndentedCommandText(text string) string  { return IndentedText(text, StyleCommand) }
-func IndentedDebugText(text string) string    { return IndentedText(text, StyleDebug) }
-func IndentedAgentText(text string) string    { return IndentedText(text, StyleAgent) }
-
-// Tree rendering functions
-func RenderTreeBranch(text string) string { return StyledText(text, StyleTreeBranch) }
-func RenderTreeFile(text string) string   { return StyledText(text, StyleTreeFile) }
-func RenderTreeDir(text string) string    { return StyledText(text, StyleTreeDir) }
-func RenderTreeSize(text string) string   { return StyledText(text, StyleTreeSize) }
-
-
-
-// Print functions with formatting and indentation
-func PrintStyled(styleType StyleType, format string, args ...interface{}) {
-	text := fmt.Sprintf(format, args...)
-	fmt.Print(IndentedText(text, styleType))
-}
-
-func PrintSuccess(format string, args ...interface{})  { PrintStyled(StyleSuccess, format, args...) }
-func PrintError(format string, args ...interface{})    { PrintStyled(StyleError, format, args...) }
-func PrintWarning(format string, args ...interface{})  { PrintStyled(StyleWarning, format, args...) }
-func PrintInfo(format string, args ...interface{})     { PrintStyled(StyleInfo, format, args...) }
-func PrintThinking(format string, args ...interface{}) { PrintStyled(StyleThinking, format, args...) }
-func PrintTool(format string, args ...interface{})     { PrintStyled(StyleTool, format, args...) }
-func PrintCommand(format string, args ...interface{})  { PrintStyled(StyleCommand, format, args...) }
-func PrintDebug(format string, args ...interface{})    { PrintStyled(StyleDebug, format, args...) }
-func PrintAgent(format string, args ...interface{})    { PrintStyled(StyleAgent, format, args...) }
-func PrintLog(format string, args ...interface{})      { PrintStyled(StyleDebug, format, args...) }
-
-// Utility function for tool output
-func IndentAndStyleToolOutput(text string) string {
-	return IndentedText(text, StyleDebug)
-}
 
 // MarkdownState represents the current parsing state
 type MarkdownState int
@@ -146,7 +88,6 @@ type MarkdownRenderer struct {
 	state            MarkdownState
 	lineStart        bool
 	codeBlock        bool
-	// indenter         *StreamingIndenter // Removed as StreamingIndenter is dead code
 	headerBuffer     strings.Builder
 	boldBuffer       strings.Builder
 	italicBuffer     strings.Builder
@@ -164,14 +105,12 @@ func NewMarkdownRenderer() *MarkdownRenderer {
 }
 
 // Write processes incoming markdown tokens and renders them with styling
-func (mr *MarkdownRenderer) Write(data []byte) (int, error) {
+func (mr *MarkdownRenderer) Write(data []byte) {
 	text := string(data)
 
 	for _, char := range text {
 		mr.processChar(char)
 	}
-
-	return len(data), nil
 }
 
 // processChar handles a single character in the markdown stream

@@ -1,9 +1,9 @@
-package models
+package api
 
 import (
 	"encoding/json"
 	"testing"
-	
+
 	"github.com/openai/openai-go"
 )
 
@@ -18,21 +18,21 @@ func TestToolCallMerging(t *testing.T) {
 			},
 		},
 		{
-			ID: "call_123", 
+			ID: "call_123",
 			Function: openai.ChatCompletionChunkChoiceDeltaToolCallFunction{
 				Arguments: `: "/some/file.go"}}`,
 			},
 		},
 	}
-	
+
 	// Simulate the merging logic from the fixed code
 	toolCallsMap := make(map[string]*openai.ChatCompletionChunkChoiceDeltaToolCall)
-	
+
 	for _, toolCallChunk := range chunks {
 		if toolCallChunk.ID == "" {
 			continue
 		}
-		
+
 		if existing, exists := toolCallsMap[toolCallChunk.ID]; exists {
 			// Merge with existing tool call
 			if toolCallChunk.Function.Name != "" {
@@ -52,27 +52,27 @@ func TestToolCallMerging(t *testing.T) {
 			}
 		}
 	}
-	
+
 	// Verify the merged result
 	if len(toolCallsMap) != 1 {
 		t.Errorf("Expected 1 merged tool call, got %d", len(toolCallsMap))
 	}
-	
+
 	mergedCall := toolCallsMap["call_123"]
 	if mergedCall == nil {
 		t.Fatal("Expected merged tool call with ID 'call_123'")
 	}
-	
+
 	expectedName := "update_context"
 	if mergedCall.Function.Name != expectedName {
 		t.Errorf("Expected function name %q, got %q", expectedName, mergedCall.Function.Name)
 	}
-	
+
 	expectedArgs := `{"add_file": {"path": "/some/file.go"}}`
 	if mergedCall.Function.Arguments != expectedArgs {
 		t.Errorf("Expected arguments %q, got %q", expectedArgs, mergedCall.Function.Arguments)
 	}
-	
+
 	// Test that the merged arguments are valid JSON
 	var args map[string]interface{}
 	if err := json.Unmarshal([]byte(mergedCall.Function.Arguments), &args); err != nil {

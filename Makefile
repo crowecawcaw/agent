@@ -1,4 +1,4 @@
-.PHONY: build test lint clean run deps check dev
+.PHONY: build test lint clean run deps check dev fmt
 
 build:
 	go build -o bin/agent .
@@ -8,6 +8,9 @@ test:
 
 lint:
 	golangci-lint run
+
+fmt:
+	gofmt -w .
 
 clean:
 	rm -rf bin/
@@ -19,6 +22,6 @@ deps:
 	go mod download
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
-check: lint test
+check: fmt lint test
 
-dev: clean lint test build
+dev: clean fmt lint test build

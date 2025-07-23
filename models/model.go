@@ -1,5 +1,10 @@
 package models
 
+import (
+	"context"
+	"time"
+)
+
 // Provider represents a static provider configuration with its models
 type Provider struct {
 	ID      string   `json:"id"`
@@ -26,10 +31,14 @@ type ModelConfig struct {
 
 // Message represents a conversation message
 type Message struct {
+	ID         string     `json:"id"` // Unique ID for the message across its lifecycle
 	Role       string     `json:"role"`
 	Content    string     `json:"content"`
+	Timestamp  time.Time  `json:"timestamp"`
+	ToolName   string     `json:"tool_name,omitempty"`
 	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Status     string     `json:"status,omitempty"` // e.g., "active", "edited", "deleted"
 }
 
 // ToolCall represents a tool call in a message
@@ -45,16 +54,24 @@ type FunctionCall struct {
 	Arguments string `json:"arguments"`
 }
 
-// ToolUseResponse represents a tool use request from the model
-type ToolUseResponse struct {
-	ID    string                 `json:"id"`
-	Name  string                 `json:"name"`
-	Input map[string]interface{} `json:"input"`
+type ToolResult struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Content string `json:"content"`
+	IsError bool   `json:"is_error"`
 }
 
-// Registry manages providers and models loaded from JSON
-type Registry struct {
-	Providers []*Provider `json:"providers"`
+// ToolFunc defines the signature for tool functions
+// Returns: (userMessage, agentMessage, error)
+// - userMessage: Rich message for human display (empty string if tool printed directly)
+// - agentMessage: Minimal status for the agent
+// - error: Any error that occurred
+type ToolFunc func(ctx context.Context, params map[string]interface{}) (string, string, error)
+
+// ToolDefinition contains metadata and function for a tool
+type ToolDefinition struct {
+	Name        string
+	Description string
+	Schema      map[string]interface{}
+	Func        ToolFunc
 }
-
-
